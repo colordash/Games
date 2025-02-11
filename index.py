@@ -31,9 +31,12 @@ PATH_COLOR = (150, 150, 150)
 
 # Pfaddefinition
 PATH = [
-    (0, 4), (1, 4), (2, 4), (3, 4), (4, 4),
-    (4, 5), (4, 6), (5, 6), (6, 6), (7, 6),
-    (7, 5), (7, 4), (8, 4), (9, 4)
+    (0, 6), (1, 6), (2, 6), (3, 6), (4, 6),
+    (5, 6), (5, 7), (5, 8), (4, 8), (3, 8),
+    (2, 8), (2, 7), (2, 6), (2, 5), (2, 4), 
+    (2, 3), (3, 3), (4, 3), (5, 3), (6, 3),
+    (7, 3), (8, 3), (8, 4), (8, 5), (8, 6),
+    (8, 7), (8, 8), (8, 9)
 ]
 
 # Tower-Typen mit Preisen und Eigenschaften
@@ -293,7 +296,7 @@ while running:
         for bullet in tower.bullets:
             bullet.draw()
 
-    # UI Anzeige
+    # Labels Anzeige
     font = pygame.font.Font(None, 36)
     text = font.render(f"Lives: {lives}", True, BLACK)
     screen.blit(text, (10, 10))
