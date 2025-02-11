@@ -5,9 +5,9 @@ import random
 
 # Initialisierung
 pygame.init()
-WIDTH, HEIGHT = 500, 500
+WIDTH, HEIGHT = 700, 500
 GRID_SIZE = 10
-CELL_SIZE = WIDTH // GRID_SIZE
+CELL_SIZE = HEIGHT // GRID_SIZE
 
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
@@ -32,7 +32,7 @@ class Enemy:
         self.pos = pygame.Vector2(self.path[0][0] * CELL_SIZE + CELL_SIZE // 2, 
                                   self.path[0][1] * CELL_SIZE + CELL_SIZE // 2)
         self.target_index = 1
-        self.speed = 2
+        self.speed = 1
         self.health = 10
         self.radius = 10
 
@@ -58,7 +58,7 @@ class Tower:
         self.y = y
         self.range = 3 * CELL_SIZE
         self.damage = 10  # Geringerer Schaden, damit Gegner nicht sofort sterben
-        self.cooldown = 1000
+        self.cooldown = 10
         self.last_shot = 0
         self.bullets = []
 
@@ -113,10 +113,15 @@ while running:
             x, y = pygame.mouse.get_pos()
             grid_x = x // CELL_SIZE
             grid_y = y // CELL_SIZE
-            if (grid_x, grid_y) not in PATH and all(
-                (grid_x != t.x // CELL_SIZE or grid_y != t.y // CELL_SIZE) for t in towers):
-                towers.append(Tower(grid_x * CELL_SIZE + CELL_SIZE//2,
-                                  grid_y * CELL_SIZE + CELL_SIZE//2))
+
+            # Überprüfe, ob der Tower innerhalb des Grids liegt (10x10 Felder)
+            if 0 <= grid_x < GRID_SIZE and 0 <= grid_y < GRID_SIZE:
+                # Stelle sicher, dass der Platz nicht auf dem Pfad oder bereits besetzt ist
+                if (grid_x, grid_y) not in PATH and all(
+                    (grid_x != t.x // CELL_SIZE or grid_y != t.y // CELL_SIZE) for t in towers
+                ):
+                    towers.append(Tower(grid_x * CELL_SIZE + CELL_SIZE//2,
+                                        grid_y * CELL_SIZE + CELL_SIZE//2))
 
     # Spawn Gegner
     spawn_timer += clock.get_rawtime()
