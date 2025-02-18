@@ -76,12 +76,14 @@ TOWER_TYPES = [
 
 # ----------------Klassen----------------------------------------------------
 class Enemy:
+    speed = 1  # Standard-Klassenattribut
+
     def __init__(self):
         self.path = deque(PATH["easy"])
         self.pos = pygame.Vector2(self.path[0][0] * CELL_SIZE + CELL_SIZE // 2, 
                                   self.path[0][1] * CELL_SIZE + CELL_SIZE // 2)
         self.target_index = 1
-        self.speed = 1
+        self.speed = Enemy.speed  # Falls kein eigenes Instanzattribut gesetzt wird
         self.health = 10
         self.radius = 10
 
@@ -121,7 +123,8 @@ class Tower:
         if now - self.last_shot > self.cooldown:
             targets = [enemy for enemy in enemies if self.in_range(enemy)]
             if targets:
-                target = random.choice(targets)
+                print(targets)
+                target = targets[0]
                 self.bullets.append(Bullet(self.x, self.y, target, self.damage))
                 self.last_shot = now
 
@@ -275,6 +278,7 @@ while running:
         # Spawn-Intervall beschleunigen
         if time_since_last_update > 7000:
             spawn_interval = max(50, spawn_interval - 20)  # Mindestintervall 50 ms
+            Enemy.speed += 0.3
             print(f"Mehr Balloons! Neuer Intervall: {spawn_interval}ms")
             time_since_last_update = 0
     else:  # Pausen-Phase (3 Sekunden)
