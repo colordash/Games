@@ -14,9 +14,34 @@ CELL_SIZE = HEIGHT // GRID_SIZE
 
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
-#kONSTANTEN
+
+#----------------kONSTANTEN--------------------------------------------
 VALUE_PER_ENEMY = 1
 SAVE_FILE = "game_data.json"
+
+# Initialisierung der Timer
+cycle_time = 0
+spawn_timer = 0
+time_since_last_update = 0
+spawn_interval = 1000  # Initialer Spawn-Intervall in ms
+
+# Spielobjekte
+enemies = []
+towers = []
+spawn_timer = 0
+time_since_last_update = 0 
+lives = 10
+gold = 200
+spawn_interval = 100
+enemy_count = 0 
+selected_tower_type = None
+running = True
+
+# Button Parameter
+BUTTON_WIDTH = 200
+BUTTON_HEIGHT = 80
+BUTTON_SPACING = 20
+START_Y = 200
 
 # Farben
 WHITE = (255, 255, 255)
@@ -36,7 +61,11 @@ PATH = {"easy":
     (2, 8), (2, 7), (2, 6), (2, 5), (2, 4), 
     (2, 3), (3, 3), (4, 3), (5, 3), (6, 3),
     (7, 3), (8, 3), (8, 4), (8, 5), (8, 6),
-    (8, 7), (8, 8), (8, 9)]
+    (8, 7), (8, 8), (8, 9)], 
+    "medium": 
+    [(0, 4), (1, 4), (2, 4), (3, 4), (4, 4),
+    (4, 5), (4, 6), (5, 6), (6, 6), (7, 6),
+    (7, 5), (7, 4), (8, 4), (9, 4)]
 }
 
 # Tower-Typen mit Preisen und Eigenschaften
@@ -46,6 +75,7 @@ TOWER_TYPES = [
     {"color": PURPLE, "price": 200, "range": 5, "damage": 20, "cooldown": 6},
 ]
 
+# ----------------Klassen----------------------------------------------------
 class Enemy:
     def __init__(self):
         self.path = deque(PATH["easy"])
@@ -118,22 +148,8 @@ class Bullet:
     def draw(self):
         pygame.draw.circle(screen, YELLOW, (int(self.pos.x), int(self.pos.y)), 3)
 
-# Spielobjekte
-enemies = []
-towers = []
-spawn_timer = 0
-lives = 10
-gold = 200
-spawn_interval = 20
-selected_tower_type = None
-running = True
 
-# Button Parameter
-BUTTON_WIDTH = 200
-BUTTON_HEIGHT = 80
-BUTTON_SPACING = 20
-START_Y = 200
-
+#----------------------def Funktionen-------------------------------------
 # Checkt ob das Intro angezeigt werden soll
 def check_first_run():
     if os.path.exists(SAVE_FILE):
@@ -143,7 +159,7 @@ def check_first_run():
             json.dump({"first_run": False}, f)
         return True  # Erstmaliger Start
 
-# --- Intro-Bildschirm ---
+# Intro-Bildschirm
 def show_intro():
     intro = True
     font_title = pygame.font.Font(None, 60)
@@ -193,10 +209,11 @@ def show_intro():
         pygame.display.flip()
         clock.tick(60)
 
+
 # Zeige das Intro, bevor das Spiel beginnt
 if check_first_run():
     show_intro()
-
+# -----------------------main loop---------------------------------
 while running:
     # Event Handling
     for event in pygame.event.get():
@@ -219,7 +236,7 @@ while running:
                 grid_y = y // CELL_SIZE
                 if selected_tower_type is not None:
                     if (0 <= grid_x < GRID_SIZE and 0 <= grid_y < GRID_SIZE and
-                        (grid_x, grid_y) not in PATH and
+                        (grid_x, grid_y) not in PATH["easy"] and
                         not any(t.x == grid_x * CELL_SIZE + CELL_SIZE//2 and
                                 t.y == grid_y * CELL_SIZE + CELL_SIZE//2 for t in towers)):
                         cost = TOWER_TYPES[selected_tower_type]['price']
@@ -236,16 +253,39 @@ while running:
                             gold -= cost
                             selected_tower_type = None
 
-    # Spawn Gegner
-    spawn_timer += clock.get_rawtime()
-    if spawn_timer > spawn_interval:
-        enemies.append(Enemy())
-        spawn_timer = 0
+
+    
+    # Zyklus-Time tracking
+    dt = clock.get_rawtime()
+    cycle_time += dt
+    cycle_time %= 23000  # 23 Sekunden Zyklus (20000 + 3000)
+    print(cycle_time)
+    
+    # Spawn-Logik
+    if cycle_time < 20000:  # Spawning-Phase (20 Sekunden)
+        # Timer aktualisieren
+        spawn_timer += dt
+        time_since_last_update += dt
+        
+        # Gegner spawnen
+        if spawn_timer > spawn_interval:
+            enemies.append(Enemy())
+            spawn_timer = 0
+            enemy_count += 1
+        
+        # Spawn-Intervall beschleunigen
+        if time_since_last_update > 20000:
+            spawn_interval = max(50, spawn_interval - 15)  # Mindestintervall 50 ms
+            print(f"Mehr Balloons! Neuer Intervall: {spawn_interval}ms")
+            time_since_last_update = 0
+    else:  # Pausen-Phase (3 Sekunden)
+        spawn_timer = 0  # Reset für nahtlosen Übergang zur nächsten Spawning-Phase
+        print("Pause")
 
     # Update
     for enemy in enemies[:]:
         enemy.update()
-        if enemy.target_index >= len(PATH):
+        if enemy.target_index >= len(PATH["easy"]):
             enemies.remove(enemy)
             lives -= 1
             if lives == 0:
@@ -270,7 +310,7 @@ while running:
     for x in range(GRID_SIZE):
         for y in range(GRID_SIZE):
             rect = pygame.Rect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
-            if (x, y) in PATH:
+            if (x, y) in PATH["easy"]:
                 pygame.draw.rect(screen, PATH_COLOR, rect)
             pygame.draw.rect(screen, (200, 200, 200), rect, 1)
 
