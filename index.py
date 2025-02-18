@@ -104,7 +104,7 @@ class Enemy:
         pygame.draw.circle(screen, RED, (int(self.pos.x), int(self.pos.y)), self.radius)
 
 class Tower:
-    def __init__(self, x, y, color, range, damage, cooldown):
+    def __init__(self, x, y, color, range, damage, cooldown, price):
         self.x = x
         self.y = y
         self.color = color
@@ -113,6 +113,7 @@ class Tower:
         self.cooldown = cooldown
         self.last_shot = 0
         self.bullets = []
+        self.price = price
 
     def in_range(self, enemy):
         distance = math.hypot(self.x - enemy.pos.x, self.y - enemy.pos.y)
@@ -130,6 +131,7 @@ class Tower:
 
     def draw(self):
         pygame.draw.rect(screen, self.color, (self.x - CELL_SIZE//2, self.y - CELL_SIZE//2, CELL_SIZE, CELL_SIZE))
+
 
 class Bullet:
     def __init__(self, x, y, target, damage):
@@ -216,85 +218,108 @@ def show_intro():
 if check_first_run():
     show_intro()
 # -----------------------main loop---------------------------------
+button_rect = None
 while running:
-    # Event Handling
+    # --- Event Handling ---
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            x, y = pygame.mouse.get_pos()
-            # Klick auf Tower-Buttons
-            if x >= 500:
-                for i, tower_type in enumerate(TOWER_TYPES):
-                    button_x = 500 + (300 - BUTTON_WIDTH) // 2
-                    button_y = START_Y + i * (BUTTON_HEIGHT + BUTTON_SPACING)
-                    rect = pygame.Rect(button_x, button_y, BUTTON_WIDTH, BUTTON_HEIGHT)
-                    if rect.collidepoint(x, y):
-                        selected_tower_type = i
+
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            x, y = event.pos
+
+            if event.button == 1:  # Linksklick
+                # Zuerst: Prüfe, ob auf den aktiven Sell-Button geklickt wurde
+                if button_rect and button_rect.collidepoint(x, y):
+                    if selected_tower in towers:
+                        gold += round(selected_tower.price/2)
+                        towers.remove(selected_tower)
+                    button_rect = None
+                    selected_tower = None
+                # Dann: Prüfe, ob in der Tower-Auswahl (rechter Bereich) geklickt wurde
+                elif x >= 500:
+                    for i, tower_type in enumerate(TOWER_TYPES):
+                        button_x = 500 + (300 - BUTTON_WIDTH) // 2
+                        button_y = START_Y + i * (BUTTON_HEIGHT + BUTTON_SPACING)
+                        rect = pygame.Rect(button_x, button_y, BUTTON_WIDTH, BUTTON_HEIGHT)
+                        if rect.collidepoint(x, y):
+                            selected_tower_type = i
+                            break
+                    # Optional: Sell-Button ausblenden, wenn in der Seitenleiste geklickt wurde
+                    button_rect = None
+                # Andernfalls: Klick auf das Grid zum Platzieren eines Towers
+                else:
+                    grid_x = x // CELL_SIZE
+                    grid_y = y // CELL_SIZE
+                    if selected_tower_type is not None:
+                        if (0 <= grid_x < GRID_SIZE and 0 <= grid_y < GRID_SIZE and
+                            (grid_x, grid_y) not in PATH["easy"] and
+                            not any(t.x == grid_x * CELL_SIZE + CELL_SIZE//2 and
+                                    t.y == grid_y * CELL_SIZE + CELL_SIZE//2 for t in towers)):
+                            cost = TOWER_TYPES[selected_tower_type]['price']
+                            if gold >= cost:
+                                tower_type = TOWER_TYPES[selected_tower_type]
+                                towers.append(Tower(
+                                    grid_x * CELL_SIZE + CELL_SIZE//2,
+                                    grid_y * CELL_SIZE + CELL_SIZE//2,
+                                    tower_type['color'],
+                                    tower_type['range'],
+                                    tower_type['damage'],
+                                    tower_type['cooldown'],
+                                    tower_type["price"]
+                                ))
+                                gold -= cost
+                                selected_tower_type = None
+                    # Klick außerhalb: Sell-Button ausblenden
+                    button_rect = None
+
+            elif event.button == 3:  # Rechtsklick
+                for tower in towers:
+                    tower_rect = pygame.Rect(
+                        tower.x - CELL_SIZE // 2,
+                        tower.y - CELL_SIZE // 2,
+                        CELL_SIZE,
+                        CELL_SIZE
+                    )
+                    if tower_rect.collidepoint(x, y):
+                        button_rect = pygame.Rect(x, y, 80, 30)
+                        selected_tower = tower
                         break
-            # Klick auf Grid
-            else:
-                grid_x = x // CELL_SIZE
-                grid_y = y // CELL_SIZE
-                if selected_tower_type is not None:
-                    if (0 <= grid_x < GRID_SIZE and 0 <= grid_y < GRID_SIZE and
-                        (grid_x, grid_y) not in PATH["easy"] and
-                        not any(t.x == grid_x * CELL_SIZE + CELL_SIZE//2 and
-                                t.y == grid_y * CELL_SIZE + CELL_SIZE//2 for t in towers)):
-                        cost = TOWER_TYPES[selected_tower_type]['price']
-                        if gold >= cost:
-                            tower_type = TOWER_TYPES[selected_tower_type]
-                            towers.append(Tower(
-                                grid_x * CELL_SIZE + CELL_SIZE//2,
-                                grid_y * CELL_SIZE + CELL_SIZE//2,
-                                tower_type['color'],
-                                tower_type['range'],
-                                tower_type['damage'],
-                                tower_type['cooldown']
-                            ))
-                            gold -= cost
-                            selected_tower_type = None
+                else:
+                    button_rect = None
 
-
-    
-    # Zyklus-Time tracking
+    # --- Update-Logik ---
     dt = clock.get_rawtime()
     cycle_time += dt
-    cycle_time %= 7300  # 23 Sekunden Zyklus (20000 + 3000)
-    print(cycle_time)
-    
-    # Spawn-Logik
-    if cycle_time < 7000:  # Spawning-Phase (20 Sekunden)
-        # Timer aktualisieren
+    cycle_time %= 7300  # Beispiel: 23 Sekunden Zyklus
+    if cycle_time < 7000:  # Spawning-Phase (z. B. 20 Sekunden)
         spawn_timer += dt
         time_since_last_update += dt
-        
-        # Gegner spawnen
+
         if spawn_timer > spawn_interval:
             enemies.append(Enemy())
             spawn_timer = 0
             enemy_count += 1
-        
-        # Spawn-Intervall beschleunigen
+
         if time_since_last_update > 7000:
             spawn_interval = max(50, spawn_interval - 20)  # Mindestintervall 50 ms
             Enemy.speed += 0.3
             print(f"Mehr Balloons! Neuer Intervall: {spawn_interval}ms")
             time_since_last_update = 0
-    else:  # Pausen-Phase (3 Sekunden)
-        spawn_timer = 0  # Reset für nahtlosen Übergang zur nächsten Spawning-Phase
-        print("Pause")
+    else:
+        spawn_timer = 0  # Reset in der Pause
 
-    # Update
+    # Gegner aktualisieren
     for enemy in enemies[:]:
         enemy.update()
         if enemy.target_index >= len(PATH["easy"]):
             enemies.remove(enemy)
             lives -= 1
-            if lives == 0:
+            if lives <= 0:
                 print("GAME OVER")
                 running = False
 
+    # Türme und ihre Bullets aktualisieren
     for tower in towers:
         tower.shoot(enemies)
         for bullet in tower.bullets[:]:
@@ -306,7 +331,7 @@ while running:
                         gold += VALUE_PER_ENEMY
                 tower.bullets.remove(bullet)
 
-    # Zeichnen
+    # --- Zeichnen ---
     screen.fill(WHITE)
 
     # Zeichne Grid
@@ -317,7 +342,7 @@ while running:
                 pygame.draw.rect(screen, PATH_COLOR, rect)
             pygame.draw.rect(screen, (200, 200, 200), rect, 1)
 
-    # Zeichne Tower-Buttons
+    # Zeichne Tower-Auswahl-Buttons
     for i, tower_type in enumerate(TOWER_TYPES):
         button_x = 500 + (300 - BUTTON_WIDTH) // 2
         button_y = START_Y + i * (BUTTON_HEIGHT + BUTTON_SPACING)
@@ -331,24 +356,29 @@ while running:
         text_rect = text.get_rect(center=rect.center)
         screen.blit(text, text_rect)
 
-    # Zeichne Objekte
+    # Zeichne Gegner
     for enemy in enemies:
         enemy.draw()
+
+    # Zeichne Türme und Bullets
     for tower in towers:
         tower.draw()
         for bullet in tower.bullets:
             bullet.draw()
 
-    # Labels Anzeige
+    # Zeichne Labels (Lives, Gold, etc.)
     font = pygame.font.Font(None, 36)
-    text = font.render(f"Lives: {lives}", True, BLACK)
-    screen.blit(text, (10, 10))
-    text = font.render(f"Gold: ${gold}", True, BLACK)
-    screen.blit(text, (500 + 150, 10))
-    text = font.render(f"Towers:", True, BLACK)
-    screen.blit(text, (500 + 50, 100))
+    screen.blit(font.render(f"Lives: {lives}", True, BLACK), (10, 10))
+    screen.blit(font.render(f"Gold: ${gold}", True, BLACK), (500 + 150, 10))
+    screen.blit(font.render("Towers:", True, BLACK), (500 + 50, 100))
+
+    # Zeichne den Sell-Button (wenn aktiv) zuletzt, damit er nicht überschrieben wird
+    if button_rect:
+        pygame.draw.rect(screen, PURPLE, button_rect)
+        font_small = pygame.font.Font(None, 24)
+        text = font_small.render(f"sell ${round(selected_tower.price/2)}", True, WHITE)
+        screen.blit(text, (button_rect.x + 5, button_rect.y + 5))
 
     pygame.display.flip()
     clock.tick(60)
 
-pygame.quit()
