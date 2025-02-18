@@ -23,7 +23,6 @@ SAVE_FILE = "game_data.json"
 cycle_time = 0
 spawn_timer = 0
 time_since_last_update = 0
-spawn_interval = 1000  # Initialer Spawn-Intervall in ms
 
 # Spielobjekte
 enemies = []
@@ -32,7 +31,7 @@ spawn_timer = 0
 time_since_last_update = 0 
 lives = 10
 gold = 200
-spawn_interval = 100
+spawn_interval = 200
 enemy_count = 0 
 selected_tower_type = None
 running = True
@@ -70,9 +69,9 @@ PATH = {"easy":
 
 # Tower-Typen mit Preisen und Eigenschaften
 TOWER_TYPES = [
-    {"color": GREEN, "price": 100, "range": 3, "damage": 10, "cooldown": 10},
-    {"color": BLUE, "price": 150, "range": 4, "damage": 15, "cooldown": 8},
-    {"color": PURPLE, "price": 200, "range": 5, "damage": 20, "cooldown": 6},
+    {"color": GREEN, "price": 100, "range": 3, "damage": 10, "cooldown": 1000},
+    {"color": BLUE, "price": 150, "range": 4, "damage": 15, "cooldown": 700},
+    {"color": PURPLE, "price": 200, "range": 5, "damage": 20, "cooldown": 500},
 ]
 
 # ----------------Klassen----------------------------------------------------
@@ -258,11 +257,11 @@ while running:
     # Zyklus-Time tracking
     dt = clock.get_rawtime()
     cycle_time += dt
-    cycle_time %= 23000  # 23 Sekunden Zyklus (20000 + 3000)
+    cycle_time %= 7300  # 23 Sekunden Zyklus (20000 + 3000)
     print(cycle_time)
     
     # Spawn-Logik
-    if cycle_time < 20000:  # Spawning-Phase (20 Sekunden)
+    if cycle_time < 7000:  # Spawning-Phase (20 Sekunden)
         # Timer aktualisieren
         spawn_timer += dt
         time_since_last_update += dt
@@ -274,8 +273,8 @@ while running:
             enemy_count += 1
         
         # Spawn-Intervall beschleunigen
-        if time_since_last_update > 20000:
-            spawn_interval = max(50, spawn_interval - 15)  # Mindestintervall 50 ms
+        if time_since_last_update > 7000:
+            spawn_interval = max(50, spawn_interval - 20)  # Mindestintervall 50 ms
             print(f"Mehr Balloons! Neuer Intervall: {spawn_interval}ms")
             time_since_last_update = 0
     else:  # Pausen-Phase (3 Sekunden)
