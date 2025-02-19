@@ -4,6 +4,7 @@ from collections import deque
 import random
 import json
 import os
+import win_screen
 
 
 # Initialisierung
@@ -14,6 +15,13 @@ CELL_SIZE = HEIGHT // GRID_SIZE
 
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
+
+# Initialisierung der Musik
+pygame.mixer.init()
+pygame.mixer.music.load("sounds/music.mp3")
+pygame.mixer.music.play(-1)  # -1 sorgt für Endlosschleife
+
+plop_sound = pygame.mixer.Sound("sounds/plop.mp3")
 
 #----------------kONSTANTEN--------------------------------------------
 VALUE_PER_ENEMY = 1
@@ -35,6 +43,7 @@ spawn_interval = 200
 enemy_count = 0 
 selected_tower_type = None
 running = True
+
 
 # Button Parameter
 BUTTON_WIDTH = 200
@@ -67,6 +76,9 @@ PATH = {"easy":
     (7, 5), (7, 4), (8, 4), (9, 4)]
 }
 
+PATH_TYPES = ["easy", "medium"]
+current_level = PATH_TYPES[0]
+
 # Tower-Typen mit Preisen und Eigenschaften
 TOWER_TYPES = [
     {"color": GREEN, "price": 100, "range": 3, "damage": 10, "cooldown": 1000},
@@ -79,7 +91,7 @@ class Enemy:
     speed = 1  # Standard-Klassenattribut
 
     def __init__(self):
-        self.path = deque(PATH["easy"])
+        self.path = deque(PATH[current_level])
         self.pos = pygame.Vector2(self.path[0][0] * CELL_SIZE + CELL_SIZE // 2, 
                                   self.path[0][1] * CELL_SIZE + CELL_SIZE // 2)
         self.target_index = 1
@@ -163,6 +175,21 @@ def check_first_run():
             json.dump({"first_run": False}, f)
         return True  # Erstmaliger Start
 
+def next_level(towers, gold, lives):
+    global current_level  # Wichtig: current_level als global deklarieren
+    try:
+        current_level = PATH_TYPES[PATH_TYPES.index(current_level) + 1]
+    except IndexError:
+        print("Keine weiteren Level!")  # Oder eine andere Aktion, z. B. zum ersten Level zurückkehren
+        win_screen.show_win_screen(gold)
+        # Beispiel: Zurück zum ersten Level
+        # current_level = PATH_TYPES[0]
+    for tower in towers[:]:
+        gold += round(tower.price/2)
+        towers.remove(tower)
+    return gold
+
+
 # Intro-Bildschirm
 def show_intro():
     intro = True
@@ -219,6 +246,7 @@ if check_first_run():
     show_intro()
 # -----------------------main loop---------------------------------
 button_rect = None
+rounds = 0
 while running:
     # --- Event Handling ---
     for event in pygame.event.get():
@@ -253,7 +281,7 @@ while running:
                     grid_y = y // CELL_SIZE
                     if selected_tower_type is not None:
                         if (0 <= grid_x < GRID_SIZE and 0 <= grid_y < GRID_SIZE and
-                            (grid_x, grid_y) not in PATH["easy"] and
+                            (grid_x, grid_y) not in PATH[current_level] and
                             not any(t.x == grid_x * CELL_SIZE + CELL_SIZE//2 and
                                     t.y == grid_y * CELL_SIZE + CELL_SIZE//2 for t in towers)):
                             cost = TOWER_TYPES[selected_tower_type]['price']
@@ -291,8 +319,8 @@ while running:
     # --- Update-Logik ---
     dt = clock.get_rawtime()
     cycle_time += dt
-    cycle_time %= 7300  # Beispiel: 23 Sekunden Zyklus
-    if cycle_time < 7000:  # Spawning-Phase (z. B. 20 Sekunden)
+    cycle_time %= 730  # Beispiel: 23 Sekunden Zyklus
+    if cycle_time < 700:  # Spawning-Phase (z. B. 20 Sekunden)
         spawn_timer += dt
         time_since_last_update += dt
 
@@ -300,20 +328,28 @@ while running:
             enemies.append(Enemy())
             spawn_timer = 0
             enemy_count += 1
+            print(cycle_time)
 
-        if time_since_last_update > 7000:
+        if time_since_last_update > 700:
             spawn_interval = max(50, spawn_interval - 20)  # Mindestintervall 50 ms
             Enemy.speed += 0.3
             print(f"Mehr Balloons! Neuer Intervall: {spawn_interval}ms")
             time_since_last_update = 0
+            rounds += 1
     else:
         spawn_timer = 0  # Reset in der Pause
+    
+    if rounds >= 1:
+        gold = next_level(towers, gold, lives)
+        rounds = 0
+
 
     # Gegner aktualisieren
     for enemy in enemies[:]:
         enemy.update()
-        if enemy.target_index >= len(PATH["easy"]):
+        if enemy.target_index >= len(PATH[current_level]):
             enemies.remove(enemy)
+            plop_sound.play()
             lives -= 1
             if lives <= 0:
                 print("GAME OVER")
@@ -338,7 +374,7 @@ while running:
     for x in range(GRID_SIZE):
         for y in range(GRID_SIZE):
             rect = pygame.Rect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
-            if (x, y) in PATH["easy"]:
+            if (x, y) in PATH[current_level]:
                 pygame.draw.rect(screen, PATH_COLOR, rect)
             pygame.draw.rect(screen, (200, 200, 200), rect, 1)
 
