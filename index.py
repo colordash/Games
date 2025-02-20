@@ -5,6 +5,7 @@ import random
 import json
 import os
 import win_screen
+import time
 
 
 # Initialisierung
@@ -24,13 +25,14 @@ pygame.mixer.music.play(-1)  # -1 sorgt für Endlosschleife
 plop_sound = pygame.mixer.Sound("sounds/plop.mp3")
 
 #----------------kONSTANTEN--------------------------------------------
-VALUE_PER_ENEMY = 1
+VALUE_PER_ENEMY = 5
 SAVE_FILE = "game_data.json"
 
 # Initialisierung der Timer
 cycle_time = 0
 spawn_timer = 0
 time_since_last_update = 0
+last_time = 0 
 
 # Spielobjekte
 enemies = []
@@ -39,7 +41,7 @@ spawn_timer = 0
 time_since_last_update = 0 
 lives = 10
 gold = 200
-spawn_interval = 200
+spawn_interval = 1000
 enemy_count = 0 
 selected_tower_type = None
 running = True
@@ -81,14 +83,14 @@ current_level = PATH_TYPES[0]
 
 # Tower-Typen mit Preisen und Eigenschaften
 TOWER_TYPES = [
-    {"color": GREEN, "price": 100, "range": 3, "damage": 10, "cooldown": 1000},
-    {"color": BLUE, "price": 150, "range": 4, "damage": 15, "cooldown": 700},
-    {"color": PURPLE, "price": 200, "range": 5, "damage": 20, "cooldown": 500},
+    {"color": GREEN, "price": 100, "range": 3, "damage": 10, "cooldown": 1400},
+    {"color": BLUE, "price": 200, "range": 4, "damage": 15, "cooldown": 1200},
+    {"color": PURPLE, "price": 600, "range": 5, "damage": 20, "cooldown": 500},
 ]
 
 # ----------------Klassen----------------------------------------------------
 class Enemy:
-    speed = 1  # Standard-Klassenattribut
+    speed = 2  # Standard-Klassenattribut
 
     def __init__(self):
         self.path = deque(PATH[current_level])
@@ -136,7 +138,6 @@ class Tower:
         if now - self.last_shot > self.cooldown:
             targets = [enemy for enemy in enemies if self.in_range(enemy)]
             if targets:
-                print(targets)
                 target = targets[0]
                 self.bullets.append(Bullet(self.x, self.y, target, self.damage))
                 self.last_shot = now
@@ -149,7 +150,7 @@ class Bullet:
     def __init__(self, x, y, target, damage):
         self.pos = pygame.Vector2(x, y)
         self.target = target
-        self.speed = 5
+        self.speed = 8
         self.damage = damage
 
     def update(self):
@@ -188,6 +189,9 @@ def next_level(towers, gold, lives):
         gold += round(tower.price/2)
         towers.remove(tower)
     return gold
+
+def get_new_interval_timer(x):
+    return round((0.04*x**2 - 0.75*x + 9.97)*100)
 
 
 # Intro-Bildschirm
@@ -245,6 +249,7 @@ def show_intro():
 if check_first_run():
     show_intro()
 # -----------------------main loop---------------------------------
+spawner_flag = True
 button_rect = None
 rounds = 0
 while running:
@@ -316,32 +321,44 @@ while running:
                 else:
                     button_rect = None
 
-    # --- Update-Logik ---
-    dt = clock.get_rawtime()
+        # --- Update-Logik ---
+    current_time = time.perf_counter() * 1000  # Umrechnung in Millisekunden
+    dt = current_time - last_time  # Zeitdifferenz in ms
+    last_time = current_time  # Aktualisiere die letzte Zeit
+
     cycle_time += dt
-    cycle_time %= 730  # Beispiel: 23 Sekunden Zyklus
-    if cycle_time < 700:  # Spawning-Phase (z. B. 20 Sekunden)
+    cycle_time %= 13000  # Beispiel: 13 Sekunden Zyklus
+
+    if cycle_time < 10000:  # Spawning-Phase (z. B. 10 Sekunden)
         spawn_timer += dt
         time_since_last_update += dt
 
-        if spawn_timer > spawn_interval:
-            enemies.append(Enemy())
+        if spawn_timer > spawn_interval and spawner_flag:
+            enemies.append(Enemy())  # Neuen Gegner hinzufügen
             spawn_timer = 0
             enemy_count += 1
             print(cycle_time)
 
-        if time_since_last_update > 700:
-            spawn_interval = max(50, spawn_interval - 20)  # Mindestintervall 50 ms
-            Enemy.speed += 0.3
+        if time_since_last_update > 10000:
+            spawn_interval = get_new_interval_timer(rounds)
+            Enemy.speed += 0.02
             print(f"Mehr Balloons! Neuer Intervall: {spawn_interval}ms")
             time_since_last_update = 0
             rounds += 1
+            print(rounds)
     else:
         spawn_timer = 0  # Reset in der Pause
-    
-    if rounds >= 1:
-        gold = next_level(towers, gold, lives)
-        rounds = 0
+
+    # Check für Levelwechsel (erst nach zwei Runden)
+    if rounds >= 10:
+        spawner_flag = False  # Stoppe das Spawnen neuer Gegner
+
+        if not enemies:  # Warten, bis alle Gegner verschwunden sind
+            print("Alle Gegner besiegt! Levelaufstieg...")
+            gold = next_level(towers, gold, lives)
+            rounds = 0
+            spawner_flag = True  # Spawner wieder aktivieren für das neue Level
+
 
 
     # Gegner aktualisieren
