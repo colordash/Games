@@ -424,6 +424,8 @@ while running:
     screen.blit(font.render(f"Lives: {lives}", True, BLACK), (10, 10))
     screen.blit(font.render(f"Gold: ${gold}", True, BLACK), (500 + 150, 10))
     screen.blit(font.render("Towers:", True, BLACK), (500 + 50, 100))
+    screen.blit(font.render(f"Raids: {rounds}/10", True, BLACK), (200,10))
+    screen.blit(font.render(f"Level: {PATH_TYPES.index(current_level) + 1}", True, BLACK), (360, 10))
 
     # Zeichne den Sell-Button (wenn aktiv) zuletzt, damit er nicht überschrieben wird
     if button_rect:
