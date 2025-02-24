@@ -5,6 +5,7 @@ import random
 import json
 import os
 import win_screen
+import defeated
 import time
 
 
@@ -13,7 +14,6 @@ pygame.init()
 WIDTH, HEIGHT = 800, 500
 GRID_SIZE = 10
 CELL_SIZE = HEIGHT // GRID_SIZE
-
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
 
@@ -23,9 +23,16 @@ pygame.mixer.music.load("sounds/music.mp3")
 pygame.mixer.music.play(-1)  # -1 sorgt für Endlosschleife
 
 plop_sound = pygame.mixer.Sound("sounds/plop.mp3")
+plop_sound.set_volume(0.4)
 
-#----------------kONSTANTEN--------------------------------------------
-VALUE_PER_ENEMY = 5
+tadaa_sound = pygame.mixer.Sound("sounds/tadaa.mp3")
+
+hit_sound = pygame.mixer.Sound("sounds/hit.mp3")
+
+game_over_sound = pygame.mixer.Sound("sounds/game_over.mp3")
+
+#----------------KONSTANTEN--------------------------------------------
+VALUE_PER_ENEMY = 10
 SAVE_FILE = "game_data.json"
 
 # Initialisierung der Timer
@@ -40,14 +47,14 @@ towers = []
 spawn_timer = 0
 time_since_last_update = 0 
 lives = 10
-gold = 200
+gold = 150
 spawn_interval = 1000
 enemy_count = 0 
 selected_tower_type = None
 running = True
 
 
-# Button Parameter
+# Button Parameter für die Towers Auswahl
 BUTTON_WIDTH = 200
 BUTTON_HEIGHT = 80
 BUTTON_SPACING = 20
@@ -83,9 +90,9 @@ current_level = PATH_TYPES[0]
 
 # Tower-Typen mit Preisen und Eigenschaften
 TOWER_TYPES = [
-    {"color": GREEN, "price": 100, "range": 3, "damage": 10, "cooldown": 1400},
-    {"color": BLUE, "price": 200, "range": 4, "damage": 15, "cooldown": 1200},
-    {"color": PURPLE, "price": 600, "range": 5, "damage": 20, "cooldown": 500},
+    {"color": GREEN, "price": 100, "range": 3, "damage": 10, "cooldown": 2500},
+    {"color": BLUE, "price": 200, "range": 4, "damage": 15, "cooldown": 1900},
+    {"color": PURPLE, "price": 600, "range": 5, "damage": 20, "cooldown": 1000},
 ]
 
 # ----------------Klassen----------------------------------------------------
@@ -102,15 +109,20 @@ class Enemy:
         self.radius = 10
 
     def update(self):
+        # Prüfen, ob noch Ziele auf dem Pfad vorhanden sind
         if self.target_index < len(self.path):
+            # Das aktuelle Ziel auf dem Pfad abrufen
             target = self.path[self.target_index]
+            # Die Zielposition im Spielfeld berechnen (Mittelpunkt der Zelle)
             target_pos = pygame.Vector2(target[0] * CELL_SIZE + CELL_SIZE//2,
                                         target[1] * CELL_SIZE + CELL_SIZE//2)
             direction = target_pos - self.pos
+            # Falls die Entfernung größer als die Bewegungsgeschwindigkeit ist, skalieren
             if direction.length() > self.speed:
                 direction.scale_to_length(self.speed)
+            # Die Position des Objekts aktualisieren
             self.pos += direction
-
+            # Falls das Ziel erreicht wurde, zum nächsten Ziel übergehen
             if self.pos.distance_to(target_pos) < 1:
                 self.target_index += 1
 
@@ -130,14 +142,18 @@ class Tower:
         self.price = price
 
     def in_range(self, enemy):
+        # berechnet ob ein einemy in seiner Schussreichweite ist
         distance = math.hypot(self.x - enemy.pos.x, self.y - enemy.pos.y)
         return distance <= self.range
 
     def shoot(self, enemies):
         now = pygame.time.get_ticks()
+        # Überprüfen, ob die Abklingzeit (Cooldown) abgelaufen ist
         if now - self.last_shot > self.cooldown:
             targets = [enemy for enemy in enemies if self.in_range(enemy)]
+            # Falls es Feinde in Reichweite gibt
             if targets:
+                # ein Schuss auf das Erste erreichbare Ziel abgeben
                 target = targets[0]
                 self.bullets.append(Bullet(self.x, self.y, target, self.damage))
                 self.last_shot = now
@@ -154,8 +170,11 @@ class Bullet:
         self.damage = damage
 
     def update(self):
+        # Überprüfen, ob das Ziel noch Lebenspunkte hat
         if self.target.health > 0:
+            # Richtung vom aktuellen Standpunkt zum Ziel berechnen
             direction = self.target.pos - self.pos
+            # Gleiches Verfahren zur Animation über das Spielfeld wie bei den Enemys
             if direction.length() > self.speed:
                 direction.scale_to_length(self.speed)
             self.pos += direction
@@ -176,23 +195,28 @@ def check_first_run():
             json.dump({"first_run": False}, f)
         return True  # Erstmaliger Start
 
+# das nächste Level wird geladen und dir das Gold zurückgegeben
 def next_level(towers, gold, lives):
     global current_level  # Wichtig: current_level als global deklarieren
     try:
         current_level = PATH_TYPES[PATH_TYPES.index(current_level) + 1]
     except IndexError:
-        print("Keine weiteren Level!")  # Oder eine andere Aktion, z. B. zum ersten Level zurückkehren
-        win_screen.show_win_screen(gold)
-        # Beispiel: Zurück zum ersten Level
-        # current_level = PATH_TYPES[0]
+        print("Keine weiteren Level!")
+        tadaa_sound.play()
+        win_screen.show_win_screen(lives)
+
     for tower in towers[:]:
         gold += round(tower.price/2)
         towers.remove(tower)
     return gold
 
-def get_new_interval_timer(x):
-    return round((0.04*x**2 - 0.75*x + 9.97)*100)
-
+# Berechnung des neuen spawnintervalles mitels Polinom der in Geogebra konstruiert wurde. 
+def get_new_interval_timer(rounds, current_level):
+    if current_level == "easy":
+        return round((0.01*rounds**3-0.02*rounds**2-1.33*rounds+10)*100)
+    elif current_level == "medium":
+        print("Level 2 hat begonnen")
+        return round((-0.01*rounds**3+0.2*rounds**2-1.5*rounds+5)*100)
 
 # Intro-Bildschirm
 def show_intro():
@@ -290,6 +314,7 @@ while running:
                             not any(t.x == grid_x * CELL_SIZE + CELL_SIZE//2 and
                                     t.y == grid_y * CELL_SIZE + CELL_SIZE//2 for t in towers)):
                             cost = TOWER_TYPES[selected_tower_type]['price']
+                            # neue Instanz der Klasse Tower wird erstellt
                             if gold >= cost:
                                 tower_type = TOWER_TYPES[selected_tower_type]
                                 towers.append(Tower(
@@ -321,7 +346,7 @@ while running:
                 else:
                     button_rect = None
 
-        # --- Update-Logik ---
+        # --- Update-Logik ----------------------------------------------------
     current_time = time.perf_counter() * 1000  # Umrechnung in Millisekunden
     dt = current_time - last_time  # Zeitdifferenz in ms
     last_time = current_time  # Aktualisiere die letzte Zeit
@@ -340,36 +365,43 @@ while running:
             print(cycle_time)
 
         if time_since_last_update > 10000:
-            spawn_interval = get_new_interval_timer(rounds)
+            spawn_interval = get_new_interval_timer(rounds, current_level)
             Enemy.speed += 0.02
             print(f"Mehr Balloons! Neuer Intervall: {spawn_interval}ms")
             time_since_last_update = 0
-            rounds += 1
             print(rounds)
+            rounds += 1
     else:
         spawn_timer = 0  # Reset in der Pause
 
-    # Check für Levelwechsel (erst nach zwei Runden)
+    # Check für Levelwechsel (erst nach Zehn Runden)
     if rounds >= 10:
         spawner_flag = False  # Stoppe das Spawnen neuer Gegner
 
-        if not enemies:  # Warten, bis alle Gegner verschwunden sind
+        if not enemies:  # Warten, bis alle Gegner verschwunden sind, dann alles zurücksetzen für das nächste level
             print("Alle Gegner besiegt! Levelaufstieg...")
             gold = next_level(towers, gold, lives)
             rounds = 0
             spawner_flag = True  # Spawner wieder aktivieren für das neue Level
+            spawn_interval = get_new_interval_timer(rounds, current_level)
+            time_since_last_update = 0
+            spawn_timer = 0
 
 
 
     # Gegner aktualisieren
-    for enemy in enemies[:]:
+    for enemy in enemies[:]: # Iteration über eine Kopie der Liste, um sicheres Entfernen zu ermöglichen
         enemy.update()
+        # Überprüfen, ob der Gegner das Ende des Pfads erreicht hat
         if enemy.target_index >= len(PATH[current_level]):
             enemies.remove(enemy)
-            plop_sound.play()
             lives -= 1
+            hit_sound.play()
+            # Game over logik
             if lives <= 0:
                 print("GAME OVER")
+                game_over_sound.play()
+                defeated.show_looser_screen()
                 running = False
 
     # Türme und ihre Bullets aktualisieren
@@ -381,10 +413,11 @@ while running:
                     bullet.target.health -= bullet.damage
                     if bullet.target.health <= 0:
                         enemies.remove(bullet.target)
+                        plop_sound.play()
                         gold += VALUE_PER_ENEMY
                 tower.bullets.remove(bullet)
 
-    # --- Zeichnen ---
+    # --- Zeichnen --------------------------------------------------------------
     screen.fill(WHITE)
 
     # Zeichne Grid
@@ -395,7 +428,7 @@ while running:
                 pygame.draw.rect(screen, PATH_COLOR, rect)
             pygame.draw.rect(screen, (200, 200, 200), rect, 1)
 
-    # Zeichne Tower-Auswahl-Buttons
+    # Zeichne der Tower-Auswahl-Buttons
     for i, tower_type in enumerate(TOWER_TYPES):
         button_x = 500 + (300 - BUTTON_WIDTH) // 2
         button_y = START_Y + i * (BUTTON_HEIGHT + BUTTON_SPACING)
@@ -433,7 +466,7 @@ while running:
         font_small = pygame.font.Font(None, 24)
         text = font_small.render(f"sell ${round(selected_tower.price/2)}", True, WHITE)
         screen.blit(text, (button_rect.x + 5, button_rect.y + 5))
-
+    # Bildschirm aktualisieren, um die Änderungen anzuzeigen
     pygame.display.flip()
     clock.tick(60)
 
