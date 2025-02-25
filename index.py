@@ -17,6 +17,9 @@ CELL_SIZE = HEIGHT // GRID_SIZE
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
 
+# Titel setzen
+pygame.display.set_caption("Towerdefense by Jamil Sostizzo")
+
 # Initialisierung der Musik
 pygame.mixer.init()
 pygame.mixer.music.load("sounds/music.mp3")
@@ -117,7 +120,7 @@ class Enemy:
             target_pos = pygame.Vector2(target[0] * CELL_SIZE + CELL_SIZE//2,
                                         target[1] * CELL_SIZE + CELL_SIZE//2)
             direction = target_pos - self.pos
-            # Falls die Entfernung größer als die Bewegungsgeschwindigkeit ist, skalieren
+            # Falls die Entfernung grösser als die Bewegungsgeschwindigkeit ist, skalieren
             if direction.length() > self.speed:
                 direction.scale_to_length(self.speed)
             # Die Position des Objekts aktualisieren
@@ -223,7 +226,7 @@ def show_intro():
     intro = True
     font_title = pygame.font.Font(None, 60)
     font_text = pygame.font.Font(None, 36)
-    # Position und Größe des Start-Buttons oben rechts (mit 20px Rand)
+    # Position und Grösse des Start-Buttons oben rechts (mit 20px Rand)
     start_button_rect = pygame.Rect(WIDTH - 220, 20, 200, 60)
 
     while intro:
@@ -328,7 +331,7 @@ while running:
                                 ))
                                 gold -= cost
                                 selected_tower_type = None
-                    # Klick außerhalb: Sell-Button ausblenden
+                    # Klick ausserhalb: Sell-Button ausblenden
                     button_rect = None
 
             elif event.button == 3:  # Rechtsklick
